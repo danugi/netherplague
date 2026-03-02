@@ -15,6 +15,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class NetherPlagueMod implements ModInitializer {
     private static final int TICK_INTERVAL = 20;
     private static final int SPREAD_ATTEMPTS_PER_PORTAL = 6;
     private static final int MAX_SPREAD_RANGE = 10;
+    private static final float FIRE_CHANCE = 0.05f;
 
     private static final Map<String, LongSet> INFECTED_BLOCKS_BY_WORLD = new HashMap<>();
 
@@ -94,6 +96,62 @@ public class NetherPlagueMod implements ModInitializer {
         }
 
         BlockPos target = portalPos.add(dx, dy, dz);
+        infectAlongRay(world, portalPos, target, random);
+    }
+
+    private void infectAlongRay(ServerWorld world, BlockPos start, BlockPos end, Random random) {
+        double x = start.getX() + 0.5;
+        double y = start.getY() + 0.5;
+        double z = start.getZ() + 0.5;
+
+        double dx = end.getX() + 0.5 - x;
+        double dy = end.getY() + 0.5 - y;
+        double dz = end.getZ() + 0.5 - z;
+
+        int stepX = Integer.compare((int) Math.signum(dx), 0);
+        int stepY = Integer.compare((int) Math.signum(dy), 0);
+        int stepZ = Integer.compare((int) Math.signum(dz), 0);
+
+        double tDeltaX = stepX == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0 / dx);
+        double tDeltaY = stepY == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0 / dy);
+        double tDeltaZ = stepZ == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0 / dz);
+
+        int blockX = MathHelper.floor(x);
+        int blockY = MathHelper.floor(y);
+        int blockZ = MathHelper.floor(z);
+
+        double tMaxX = nextBoundaryT(x, dx, blockX, stepX);
+        double tMaxY = nextBoundaryT(y, dy, blockY, stepY);
+        double tMaxZ = nextBoundaryT(z, dz, blockZ, stepZ);
+
+        int maxSteps = MAX_SPREAD_RANGE * 3;
+        BlockPos.Mutable cursor = new BlockPos.Mutable(blockX, blockY, blockZ);
+
+        for (int i = 0; i < maxSteps; i++) {
+            if (tMaxX < tMaxY) {
+                if (tMaxX < tMaxZ) {
+                    blockX += stepX;
+                    tMaxX += tDeltaX;
+                } else {
+                    blockZ += stepZ;
+                    tMaxZ += tDeltaZ;
+                }
+            } else {
+                if (tMaxY < tMaxZ) {
+                    blockY += stepY;
+                    tMaxY += tDeltaY;
+                } else {
+                    blockZ += stepZ;
+                    tMaxZ += tDeltaZ;
+                }
+            }
+
+            cursor.set(blockX, blockY, blockZ);
+            if (!world.isChunkLoaded(cursor)) {
+                return;
+            }
+
+            BlockState state = world.getBlockState(cursor);
         infectAlongLine(world, portalPos, target);
     }
 
@@ -123,19 +181,28 @@ public class NetherPlagueMod implements ModInitializer {
                 continue;
             }
 
-            if (!isInfectable(world, current, state)) {
+            if (!isInfectable(world, cursor, state)) {
                 return;
             }
 
-            world.setBlockState(current, Blocks.NETHERRACK.getDefaultState(), Block.NOTIFY_ALL);
-            markInfected(world, current);
+            BlockPos infectedPos = cursor.toImmutable();
+            world.setBlockState(infectedPos, Blocks.NETHERRACK.getDefaultState(), Block.NOTIFY_ALL);
+            markInfected(world, infectedPos);
 
-            BlockPos above = current.up();
-            if (world.getBlockState(above).isAir()) {
+            BlockPos above = infectedPos.up();
+            if (random.nextFloat() < FIRE_CHANCE && world.getBlockState(above).isAir()) {
                 world.setBlockState(above, Blocks.FIRE.getDefaultState(), Block.NOTIFY_ALL);
             }
             return;
         }
+    }
+
+    private double nextBoundaryT(double origin, double delta, int block, int step) {
+        if (step == 0) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double boundary = step > 0 ? block + 1.0 : block;
+        return (boundary - origin) / delta;
     }
 
     private boolean isInfectable(ServerWorld world, BlockPos pos, BlockState state) {
