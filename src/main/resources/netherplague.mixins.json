@@ -1,0 +1,7 @@
+{
+  "required": false,
+  "package": "ru.netherplague.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": []
+}

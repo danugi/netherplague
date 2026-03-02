@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "netherplague",
+  "version": "${version}",
+  "name": "Nether Plague",
+  "description": "Nether infection spreads from portals unless blocked by crying obsidian.",
+  "authors": [
+    "Codex"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "ru.netherplague.NetherPlagueMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "fabric": "*",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
