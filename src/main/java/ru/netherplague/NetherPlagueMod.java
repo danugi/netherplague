@@ -152,6 +152,27 @@ public class NetherPlagueMod implements ModInitializer {
             }
 
             BlockState state = world.getBlockState(cursor);
+        infectAlongLine(world, portalPos, target);
+    }
+
+    private void infectAlongLine(ServerWorld world, BlockPos start, BlockPos end) {
+        int dx = end.getX() - start.getX();
+        int dy = end.getY() - start.getY();
+        int dz = end.getZ() - start.getZ();
+
+        int steps = Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz)));
+        if (steps == 0) {
+            return;
+        }
+
+        for (int step = 1; step <= steps; step++) {
+            int x = start.getX() + dx * step / steps;
+            int y = start.getY() + dy * step / steps;
+            int z = start.getZ() + dz * step / steps;
+            BlockPos current = new BlockPos(x, y, z);
+
+            BlockState state = world.getBlockState(current);
+
             if (state.isOf(Blocks.CRYING_OBSIDIAN)) {
                 return;
             }
